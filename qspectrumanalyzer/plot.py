@@ -1,17 +1,25 @@
-import collections, math
+import collections
+import math
+from curses import update_lines_cols
 
 from Qt import QtCore
+from PyQt5.QtCore import pyqtSignal
 import pyqtgraph as pg
 
 # Basic PyQtGraph settings
 pg.setConfigOptions(antialias=True)
 
 
-class SpectrumPlotWidget:
+class SpectrumPlotWidget(QtCore.QObject):
     """Main spectrum plot"""
+    mouse_moved_signal = pyqtSignal(object, object, name='mouse_moved')
+
     def __init__(self, layout):
+        super().__init__()
+
         if not isinstance(layout, pg.GraphicsLayoutWidget):
-            raise ValueError("layout must be instance of pyqtgraph.GraphicsLayoutWidget")
+            raise ValueError(
+                "layout must be instance of pyqtgraph.GraphicsLayoutWidget")
 
         self.layout = layout
 
@@ -44,8 +52,8 @@ class SpectrumPlotWidget:
         self.plot.setLimits(xMin=0)
         self.plot.showButtons()
 
-        #self.plot.setDownsampling(mode="peak")
-        #self.plot.setClipToView(True)
+        # self.plot.setDownsampling(mode="peak")
+        # self.plot.setClipToView(True)
 
         self.create_baseline_curve()
         self.create_persistence_curves()
@@ -58,7 +66,7 @@ class SpectrumPlotWidget:
         self.vLine = pg.InfiniteLine(angle=90, movable=False)
         self.vLine.setZValue(1000)
         self.hLine = pg.InfiniteLine(angle=0, movable=False)
-        self.vLine.setZValue(1000)
+        self.hLine.setZValue(1000)
         self.plot.addItem(self.vLine, ignoreBounds=True)
         self.plot.addItem(self.hLine, ignoreBounds=True)
         self.mouseProxy = pg.SignalProxy(self.plot.scene().sigMouseMoved,
@@ -97,7 +105,8 @@ class SpectrumPlotWidget:
         for i in range(self.persistence_length):
             alpha = 255 * decay(i + 1, self.persistence_length + 1)
             color = self.persistence_color
-            curve = self.plot.plot(pen=(color.red(), color.green(), color.blue(), alpha))
+            curve = self.plot.plot(
+                pen=(color.red(), color.green(), color.blue(), alpha))
             curve.setZValue(z_index_base - i)
             self.persistence_curves.append(curve)
 
@@ -146,7 +155,8 @@ class SpectrumPlotWidget:
             return
 
         if self.peak_hold_max or force:
-            self.curve_peak_hold_max.setData(data_storage.x, data_storage.peak_hold_max)
+            self.curve_peak_hold_max.setData(
+                data_storage.x, data_storage.peak_hold_max)
             if force:
                 self.curve_peak_hold_max.setVisible(self.peak_hold_max)
 
@@ -156,7 +166,8 @@ class SpectrumPlotWidget:
             return
 
         if self.peak_hold_min or force:
-            self.curve_peak_hold_min.setData(data_storage.x, data_storage.peak_hold_min)
+            self.curve_peak_hold_min.setData(
+                data_storage.x, data_storage.peak_hold_min)
             if force:
                 self.curve_peak_hold_min.setVisible(self.peak_hold_min)
 
@@ -177,7 +188,8 @@ class SpectrumPlotWidget:
             return
 
         if self.baseline or force:
-            self.curve_baseline.setData(data_storage.baseline_x, data_storage.baseline)
+            self.curve_baseline.setData(
+                data_storage.baseline_x, data_storage.baseline)
             if force:
                 self.curve_baseline.setVisible(self.baseline)
 
@@ -188,7 +200,8 @@ class SpectrumPlotWidget:
 
         if self.persistence or force:
             if self.persistence_data is None:
-                self.persistence_data = collections.deque(maxlen=self.persistence_length)
+                self.persistence_data = collections.deque(
+                    maxlen=self.persistence_length)
             else:
                 for i, y in enumerate(self.persistence_data):
                     curve = self.persistence_curves[i]
@@ -202,11 +215,16 @@ class SpectrumPlotWidget:
         if data_storage.x is None:
             return
 
-        QtCore.QTimer.singleShot(0, lambda: self.update_plot(data_storage, force=True))
-        QtCore.QTimer.singleShot(0, lambda: self.update_average(data_storage, force=True))
-        QtCore.QTimer.singleShot(0, lambda: self.update_baseline(data_storage, force=True))
-        QtCore.QTimer.singleShot(0, lambda: self.update_peak_hold_max(data_storage, force=True))
-        QtCore.QTimer.singleShot(0, lambda: self.update_peak_hold_min(data_storage, force=True))
+        QtCore.QTimer.singleShot(
+            0, lambda: self.update_plot(data_storage, force=True))
+        QtCore.QTimer.singleShot(
+            0, lambda: self.update_average(data_storage, force=True))
+        QtCore.QTimer.singleShot(
+            0, lambda: self.update_baseline(data_storage, force=True))
+        QtCore.QTimer.singleShot(
+            0, lambda: self.update_peak_hold_max(data_storage, force=True))
+        QtCore.QTimer.singleShot(
+            0, lambda: self.update_peak_hold_min(data_storage, force=True))
 
     def recalculate_persistence(self, data_storage):
         """Recalculate persistence data and update persistence curves"""
@@ -214,16 +232,17 @@ class SpectrumPlotWidget:
             return
 
         self.clear_persistence()
-        self.persistence_data = collections.deque(maxlen=self.persistence_length)
+        self.persistence_data = collections.deque(
+            maxlen=self.persistence_length)
         for i in range(min(self.persistence_length, data_storage.history.history_size - 1)):
             data = data_storage.history[-i - 2]
             if data_storage.smooth:
                 data = data_storage.smooth_data(data)
             self.persistence_data.append(data)
-        QtCore.QTimer.singleShot(0, lambda: self.update_persistence(data_storage, force=True))
+        QtCore.QTimer.singleShot(
+            0, lambda: self.update_persistence(data_storage, force=True))
 
-    def mouse_moved(self, evt):
-        """Update crosshair when mouse is moved"""
+    def update_crosshair_pos(self, evt):
         pos = evt[0]
         if self.plot.sceneBoundingRect().contains(pos):
             mousePoint = self.plot.vb.mapSceneToView(pos)
@@ -235,6 +254,11 @@ class SpectrumPlotWidget:
             )
             self.vLine.setPos(mousePoint.x())
             self.hLine.setPos(mousePoint.y())
+
+    def mouse_moved(self, evt):
+        """Update crosshair when mouse is moved"""
+        self.update_crosshair_pos(evt)
+        self.mouse_moved_signal.emit(self, evt)
 
     def clear_plot(self):
         """Clear main spectrum curve"""
@@ -265,14 +289,20 @@ class SpectrumPlotWidget:
         self.create_persistence_curves()
 
 
-class WaterfallPlotWidget:
+class WaterfallPlotWidget(QtCore.QObject):
     """Waterfall plot"""
+    mouse_moved_signal = pyqtSignal(object, object, name='mouse_moved')
+
     def __init__(self, layout, histogram_layout=None):
+        super().__init__()
+
         if not isinstance(layout, pg.GraphicsLayoutWidget):
-            raise ValueError("layout must be instance of pyqtgraph.GraphicsLayoutWidget")
+            raise ValueError(
+                "layout must be instance of pyqtgraph.GraphicsLayoutWidget")
 
         if histogram_layout and not isinstance(histogram_layout, pg.GraphicsLayoutWidget):
-            raise ValueError("histogram_layout must be instance of pyqtgraph.GraphicsLayoutWidget")
+            raise ValueError(
+                "histogram_layout must be instance of pyqtgraph.GraphicsLayoutWidget")
 
         self.layout = layout
         self.histogram_layout = histogram_layout
@@ -284,17 +314,18 @@ class WaterfallPlotWidget:
 
     def create_plot(self):
         """Create waterfall plot"""
-        self.plot = self.layout.addPlot()
+        self.posLabel = self.layout.addLabel(row=0, col=0, justify="right")
+        self.plot = self.layout.addPlot(row=1, col=0)
         self.plot.setLabel("bottom", "Frequency", units="Hz")
         self.plot.setLabel("left", "Time")
 
         self.plot.setYRange(-self.history_size, 0)
         self.plot.setLimits(xMin=0, yMax=0)
         self.plot.showButtons()
-        #self.plot.setAspectLocked(True)
+        # self.plot.setAspectLocked(True)
 
-        #self.plot.setDownsampling(mode="peak")
-        #self.plot.setClipToView(True)
+        # self.plot.setDownsampling(mode="peak")
+        # self.plot.setClipToView(True)
 
         # Setup histogram widget (for controlling waterfall plot levels and gradients)
         if self.histogram_layout:
@@ -304,6 +335,13 @@ class WaterfallPlotWidget:
             #self.histogram.setHistogramRange(-50, 0)
             #self.histogram.setLevels(-50, 0)
 
+        # Create crosshair
+        self.vLine = pg.InfiniteLine(angle=90, movable=False)
+        self.vLine.setZValue(1000)
+        self.plot.addItem(self.vLine, ignoreBounds=True)
+        self.mouseProxy = pg.SignalProxy(self.plot.scene().sigMouseMoved,
+                                         rateLimit=60, slot=self.mouse_moved)
+
     def update_plot(self, data_storage):
         """Update waterfall plot"""
         self.counter += 1
@@ -311,7 +349,8 @@ class WaterfallPlotWidget:
         # Create waterfall image on first run
         if self.counter == 1:
             self.waterfallImg = pg.ImageItem()
-            self.waterfallImg.scale((data_storage.x[-1] - data_storage.x[0]) / len(data_storage.x), 1)
+            self.waterfallImg.scale(
+                (data_storage.x[-1] - data_storage.x[0]) / len(data_storage.x), 1)
             self.plot.clear()
             self.plot.addItem(self.waterfallImg)
 
@@ -329,6 +368,22 @@ class WaterfallPlotWidget:
         # (must be done after first data is received or else levels would be wrong)
         if self.counter == 1 and self.histogram_layout:
             self.histogram.setImageItem(self.waterfallImg)
+
+    def update_crosshair_pos(self, evt):
+        pos = evt[0]
+        if self.plot.sceneBoundingRect().contains(pos):
+            mousePoint = self.plot.vb.mapSceneToView(pos)
+            self.posLabel.setText(
+                "<span style='font-size: 12pt'>f={:0.3f} MHz</span>".format(
+                    mousePoint.x() / 1e6
+                )
+            )
+            self.vLine.setPos(mousePoint.x())
+
+    def mouse_moved(self, evt):
+        """Update crosshair when mouse is moved"""
+        self.update_crosshair_pos(evt)
+        self.mouse_moved_signal.emit(self, evt)
 
     def clear_plot(self):
         """Clear waterfall plot"""

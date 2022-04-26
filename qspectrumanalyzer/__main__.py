@@ -46,6 +46,10 @@ class QSpectrumAnalyzerMainWindow(QtWidgets.QMainWindow, Ui_QSpectrumAnalyzerMai
         self.spectrumPlotWidget = SpectrumPlotWidget(self.mainPlotLayout)
         self.waterfallPlotWidget = WaterfallPlotWidget(self.waterfallPlotLayout, self.histogramPlotLayout)
 
+        # Update crosshairs on mouse moved signal
+        self.spectrumPlotWidget.mouse_moved_signal.connect(self.update_crosshair_pos)
+        self.waterfallPlotWidget.mouse_moved_signal.connect(self.update_crosshair_pos)
+
         # Link main spectrum plot to waterfall plot
         self.spectrumPlotWidget.plot.setXLink(self.waterfallPlotWidget.plot)
 
@@ -62,6 +66,13 @@ class QSpectrumAnalyzerMainWindow(QtWidgets.QMainWindow, Ui_QSpectrumAnalyzerMai
 
         self.update_buttons()
         self.load_settings()
+
+    def update_crosshair_pos(self, obj, evt):
+        type_name = type(obj).__name__
+        if (type_name == 'SpectrumPlotWidget'):
+            self.waterfallPlotWidget.update_crosshair_pos(evt)
+        elif (type_name == 'WaterfallPlotWidget'):
+            self.spectrumPlotWidget.update_crosshair_pos(evt)
 
     def setup_power_thread(self):
         """Create power_thread and connect signals to slots"""
