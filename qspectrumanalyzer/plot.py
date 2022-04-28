@@ -344,6 +344,9 @@ class WaterfallPlotWidget(QtCore.QObject):
 
     def update_plot(self, data_storage):
         """Update waterfall plot"""
+        if data_storage.x is None:
+            return
+
         self.counter += 1
 
         # Create waterfall image on first run
